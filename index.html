@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>焚香</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="ritual" aria-label="焚香摄像头互动场景">
+      <canvas id="scene" aria-label="点击香头点香"></canvas>
+
+      <section class="time-seal" aria-live="polite">
+        <div id="solarTime">--</div>
+        <div id="ganzhiTime">--</div>
+      </section>
+
+      <div id="quietHint" class="quiet-hint">请点香</div>
+      <div id="cameraState" class="camera-state">静候</div>
+
+      <video id="cameraFeed" playsinline muted aria-hidden="true"></video>
+      <canvas id="motionBuffer" aria-hidden="true"></canvas>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

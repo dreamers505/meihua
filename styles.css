@@ -1,0 +1,169 @@
+:root {
+  color-scheme: dark;
+  --ink: #0d0b08;
+  --warm-ink: #1b130c;
+  --ember: #d87a36;
+  --paper: rgba(232, 220, 198, 0.72);
+  --paper-dim: rgba(232, 220, 198, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #050403;
+  font-family:
+    "Noto Serif SC", "Songti SC", "STSong", "SimSun", Georgia, serif;
+  touch-action: none;
+  user-select: none;
+}
+
+body {
+  min-width: 320px;
+  min-height: 480px;
+}
+
+.ritual {
+  position: relative;
+  width: 100vw;
+  height: 100svh;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 52% 65%, rgba(125, 82, 42, 0.2), transparent 28%),
+    radial-gradient(circle at 50% 34%, rgba(92, 75, 58, 0.12), transparent 24%),
+    linear-gradient(180deg, #090806 0%, #11100c 48%, #080604 100%);
+}
+
+.ritual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 8%, transparent 92%, rgba(255, 255, 255, 0.02)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 5px);
+  mix-blend-mode: soft-light;
+  opacity: 0.28;
+}
+
+.ritual::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 32%, rgba(0, 0, 0, 0.44) 74%),
+    radial-gradient(ellipse at 50% 96%, rgba(0, 0, 0, 0.3), transparent 32%);
+}
+
+#scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.time-seal {
+  position: absolute;
+  top: clamp(18px, 3.2vw, 42px);
+  left: clamp(18px, 3.2vw, 46px);
+  z-index: 3;
+  display: grid;
+  gap: 0.42rem;
+  max-width: min(82vw, 440px);
+  padding-left: 0.9rem;
+  color: var(--paper);
+  border-left: 1px solid rgba(175, 107, 51, 0.38);
+  text-shadow: 0 0 24px rgba(215, 149, 82, 0.18);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.time-seal div:first-child {
+  font-size: clamp(0.76rem, 1.5vw, 1rem);
+  font-weight: 400;
+  opacity: 0.86;
+}
+
+.time-seal div:last-child {
+  font-size: clamp(0.82rem, 1.55vw, 1.08rem);
+  line-height: 1.5;
+  color: var(--paper-dim);
+  writing-mode: horizontal-tb;
+}
+
+.quiet-hint,
+.camera-state {
+  position: absolute;
+  z-index: 3;
+  color: rgba(235, 220, 191, 0.58);
+  pointer-events: none;
+  text-shadow: 0 0 28px rgba(216, 122, 54, 0.2);
+  transition:
+    opacity 900ms ease,
+    transform 900ms ease;
+}
+
+.quiet-hint {
+  left: 50%;
+  bottom: clamp(156px, 19vh, 230px);
+  transform: translateX(-50%);
+  font-size: clamp(1rem, 2.4vw, 1.45rem);
+  opacity: 0.74;
+}
+
+.quiet-hint.is-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.camera-state {
+  right: clamp(16px, 3vw, 42px);
+  bottom: clamp(20px, 4vw, 42px);
+  max-width: 44vw;
+  font-size: clamp(0.72rem, 1.35vw, 0.9rem);
+  color: rgba(210, 188, 158, 0.36);
+  opacity: 0;
+}
+
+.camera-state.is-visible {
+  opacity: 0.58;
+}
+
+#cameraFeed,
+#motionBuffer {
+  position: absolute;
+  width: 96px;
+  height: 72px;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 680px) {
+  .time-seal {
+    top: 18px;
+    left: 18px;
+    padding-left: 0.7rem;
+  }
+
+  .camera-state {
+    right: 18px;
+    bottom: 18px;
+    max-width: 58vw;
+  }
+}
