@@ -117,6 +117,7 @@ body {
 }
 
 .quiet-hint {
+  display: none;
   left: 50%;
   bottom: clamp(156px, 19vh, 230px);
   transform: translateX(-50%);

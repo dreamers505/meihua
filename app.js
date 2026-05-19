@@ -14,12 +14,17 @@
   const stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
   const branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
   const prompts = {
-    straight: ["清明", "定心", "许愿", "静观", "愿力上行"],
-    spiral: ["能量汇聚", "思绪回环", "内在对话", "灵感升起"],
-    split: ["分心", "选择", "交会", "扰动", "需要安静"],
-    broken: ["气息不稳", "暂停", "调整", "回到当下"],
-    curl: ["和谐", "流动", "灵性", "创造", "安然"],
-    low: ["返气", "牵挂", "旧事浮现", "理清思绪"],
+    peaceful: ["清明", "定心", "静观", "心安", "安然", "澄明", "念随心起", "心定象明", "静中见机", "清和自守", "观象得机", "风来有信"],
+    settling: ["收心", "缓息", "暂停", "守中", "止念", "静候", "收念归心", "心乱先静", "莫急占断", "以静候机", "慢看其象", "念起即觉"],
+  };
+
+  const promptGroupByMode = {
+    straight: "peaceful",
+    spiral: "peaceful",
+    curl: "peaceful",
+    split: "settling",
+    broken: "settling",
+    low: "settling",
   };
 
   const state = {
@@ -33,9 +38,16 @@
     particles: [],
     sparks: [],
     words: [],
+    hint: {
+      phase: "waiting",
+      dissolveStart: 0,
+      wisps: [],
+    },
     lastPromptAt: 0,
     activeMode: "straight",
     modeSince: 0,
+    modeCandidate: "straight",
+    modeCandidateSince: 0,
     shape: {
       vertical: 1,
       spiral: 0.08,
@@ -54,6 +66,7 @@
       y: 0,
       lastX: 0,
       lastY: 0,
+      lastMoveAt: 0,
       amount: 0,
       flowX: 0,
       active: false,
@@ -89,7 +102,7 @@
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
-    dpr = Math.min(window.devicePixelRatio || 1, 1.45);
+    dpr = Math.min(window.devicePixelRatio || 1, 1.15);
     width = Math.max(320, rect.width);
     height = Math.max(480, rect.height);
     canvas.width = Math.round(width * dpr);
@@ -157,21 +170,21 @@
   function ignite(now = performance.now()) {
     if (state.phase !== "idle") return;
 
+    const layout = getLayout();
     state.phase = "igniting";
     state.ignitionStart = now;
     state.burnStart = now + 1300;
-    quietHint.classList.add("is-hidden");
+    state.lastPromptAt = now;
+    startHintDissolve(layout, now);
     setCameraStatus("正在借一缕风", true);
-    requestCamera();
+    window.setTimeout(() => requestCamera(), 900);
 
-    const layout = getLayout();
-    for (let i = 0; i < 38; i += 1) {
+    for (let i = 0; i < 26; i += 1) {
       spawnSpark(layout.head.x, layout.head.y, true);
     }
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 2; i += 1) {
       spawnSmoke(layout.head, 1.12);
     }
-    spawnWord("火起", layout.head.x, layout.head.y - 42, 2600);
   }
 
   async function requestCamera() {
@@ -214,6 +227,38 @@
     cameraState.classList.toggle("is-visible", visible && Boolean(text));
   }
 
+  function getHintPosition(layout) {
+    return {
+      x: layout.head.x,
+      y: Math.max(72, layout.head.y - clamp(height * 0.062, 38, 56)),
+    };
+  }
+
+  function startHintDissolve(layout, now) {
+    state.hint.phase = "dissolving";
+    state.hint.dissolveStart = now;
+    state.hint.wisps = [];
+
+    const hint = getHintPosition(layout);
+    const fontSize = clamp(width * 0.027, 18, 30);
+    const letterGap = fontSize * 1.05;
+    for (let letter = 0; letter < 3; letter += 1) {
+      const baseX = hint.x + (letter - 1) * letterGap;
+      for (let i = 0; i < 16; i += 1) {
+        state.hint.wisps.push({
+          x: baseX + randomRange(-fontSize * 0.34, fontSize * 0.34),
+          y: hint.y + randomRange(-fontSize * 0.36, fontSize * 0.36),
+          vx: randomRange(-7, 7) + (letter - 1) * randomRange(1, 5),
+          vy: randomRange(-20, -6),
+          age: 0,
+          life: randomRange(2.4, 3.9),
+          size: randomRange(0.28, 1.05),
+          seed: randomRange(0, 1000),
+        });
+      }
+    }
+  }
+
   function spawnSpark(x, y, burst = false) {
     const angle = randomRange(-Math.PI, 0);
     const speed = burst ? randomRange(18, 90) : randomRange(6, 22);
@@ -232,23 +277,35 @@
     const splitSign = Math.random() < 0.5 ? -1 : 1;
     const shape = state.shape;
     const input = state.input;
+    const now = performance.now();
+    const ignitionStir = getIgnitionStir(now);
+    const ignitionFlow = getIgnitionFlow(now);
     const ignitionLift = state.phase === "igniting" ? 1.25 : 1;
-    const startX = head.x + randomRange(-1.1, 1.1);
+    const disturbance = clamp(
+      input.amount * 0.92 + Math.abs(input.flowX) * 0.84 + shape.split * 0.24 + ignitionStir * 0.36,
+      0,
+      1,
+    );
+    const startX = head.x + randomRange(-1.1 - disturbance * 2.4 - ignitionStir * 2.2, 1.1 + disturbance * 2.4 + ignitionStir * 2.2);
     const startY = head.y + randomRange(-2.2, 1);
-    const trailLength = Math.round(randomRange(44, 72));
+    const trailLength = Math.round(randomRange(44, 74) * (1 - ignitionStir * 0.2));
     const trail = [{ x: startX, y: startY }];
 
     state.particles.push({
       x: startX,
       y: startY,
-      vx: input.flowX * randomRange(5, 16) + shape.split * splitSign * randomRange(3, 13),
-      vy: randomRange(-34, -22) * ignitionLift,
+      vx:
+        (input.flowX + ignitionFlow * 0.5) * randomRange(7, 20) +
+        disturbance * splitSign * randomRange(4, 14) +
+        ignitionStir * splitSign * randomRange(5, 18),
+      vy: randomRange(-31, -18) * ignitionLift * (1 - disturbance * 0.28),
       age: 0,
-      life: randomRange(6.8, 11.5) * (shape.low > 0.5 ? 0.82 : 1),
-      width: randomRange(2.6, 6.4) * strength,
+      life: randomRange(8.2, 12.8) * (1 - ignitionStir * 0.38) * (shape.low > 0.5 ? 0.9 : 1),
+      width: randomRange(3.6, 8.8) * strength,
       seed: randomRange(0, 1000),
       spin: randomRange(-1, 1),
-      baseAlpha: randomRange(0.055, 0.13) * clamp(strength, 0.72, 1.25),
+      silk: randomRange(0.72, 1.35),
+      baseAlpha: randomRange(0.094, 0.19) * clamp(strength, 0.72, 1.28),
       splitSign,
       ribbon: Math.random() < 0.42,
       trail,
@@ -270,10 +327,26 @@
     });
   }
 
+  function getIgnitionStir(now) {
+    if ((state.phase !== "igniting" && state.phase !== "burning") || !state.ignitionStart) return 0;
+    const age = (now - state.ignitionStart) / 1000;
+    if (age <= 0 || age >= 20) return 0;
+    return smoothstep(0, 0.9, age) * (1 - smoothstep(15.5, 20, age));
+  }
+
+  function getIgnitionFlow(now) {
+    const stir = getIgnitionStir(now);
+    if (!stir) return 0;
+    const slow = Math.sin(now * 0.00105);
+    const soft = noise2(now * 0.00042, 7.3) - 0.5;
+    return clamp((slow * 0.62 + soft * 1.15) * stir, -1, 1);
+  }
+
   function update(now, dt) {
     updateBurn(now);
     updateInput(now, dt);
     updateShape(dt);
+    updateHint(now, dt);
     updateSmoke(now, dt);
     updateSparks(dt);
     updateWords(dt);
@@ -300,27 +373,28 @@
 
     if (state.phase === "ended" && !state.finalWordSpawned) {
       const layout = getLayout();
-      spawnWord("香尽，愿留", layout.centerX, layout.topInitial - 20, 9000);
+      spawnWord("香尽，愿留", layout.centerX, layout.topInitial - 20, 12000);
       state.finalWordSpawned = true;
       setCameraStatus("", false);
     }
   }
 
   function updateInput(now, dt) {
-    state.pointer.amount *= Math.exp(-dt * 2.2);
-    state.pointer.flowX *= Math.exp(-dt * 2.7);
+    state.pointer.amount *= Math.exp(-dt * 1);
+    state.pointer.flowX *= Math.exp(-dt * 1.15);
 
     if (state.camera.ready && now - state.camera.lastSample > 150) {
       sampleCamera(now);
     }
 
-    state.camera.amount *= Math.exp(-dt * 0.45);
-    state.camera.flowX *= Math.exp(-dt * 0.65);
+    state.camera.amount *= Math.exp(-dt * 0.3);
+    state.camera.flowX *= Math.exp(-dt * 0.42);
 
-    const cameraWeight = state.camera.ready ? 0.78 : 0;
-    const pointerWeight = state.camera.ready ? 0.26 : 1;
+    const cameraWeight = state.camera.ready ? 0.68 : 0;
+    const pointerWeight = state.camera.ready ? 0.48 : 1;
+    const cameraAir = state.camera.ready ? 0.16 : 0;
     const targetAmount = clamp(
-      state.camera.amount * cameraWeight + state.pointer.amount * pointerWeight,
+      state.camera.amount * cameraWeight + state.pointer.amount * pointerWeight + cameraAir,
       0,
       1,
     );
@@ -330,12 +404,12 @@
       1,
     );
 
-    state.input.amount = lerp(state.input.amount, targetAmount, 1 - Math.exp(-dt * 2.8));
-    state.input.flowX = lerp(state.input.flowX, targetFlowX, 1 - Math.exp(-dt * 2.4));
+    state.input.amount = lerp(state.input.amount, targetAmount, 1 - Math.exp(-dt * 1.85));
+    state.input.flowX = lerp(state.input.flowX, targetFlowX, 1 - Math.exp(-dt * 2.2));
     state.input.brightness = lerp(
       state.input.brightness,
       state.camera.brightness,
-      1 - Math.exp(-dt * 1.4),
+      1 - Math.exp(-dt * 0.68),
     );
   }
 
@@ -387,42 +461,51 @@
     state.camera.amount = lerp(
       state.camera.amount,
       clamp(rawAmount + brightnessDelta * 3.4, 0, 1),
-      0.45,
+      0.3,
     );
-    state.camera.flowX = lerp(state.camera.flowX, flowX, 0.55);
+    state.camera.flowX = lerp(state.camera.flowX, flowX, 0.34);
     state.camera.brightness = lerp(state.camera.brightness, brightnessDelta, 0.38);
     state.camera.previous = current;
-    state.camera.previousCenterX = lerp(state.camera.previousCenterX, centerX, 0.35);
+    state.camera.previousCenterX = lerp(state.camera.previousCenterX, centerX, 0.24);
     state.camera.previousBrightness = brightness;
     state.camera.lastSample = now;
   }
 
   function updateShape(dt) {
+    const now = performance.now();
     const motion = state.input.amount;
     const flow = Math.abs(state.input.flowX);
-    const breath = 0.5 + Math.sin(performance.now() * 0.00023) * 0.5;
+    const breath = 0.5 + Math.sin(now * 0.00023) * 0.5;
+    const ignitionStir = getIgnitionStir(now);
+    const ignitionFlow = Math.abs(getIgnitionFlow(now));
+    const cameraAir = state.camera.ready ? 0.18 : 0;
+    const disturbance = clamp(
+      motion * 0.92 + flow * 0.84 + state.input.brightness * 0.44 + cameraAir + ignitionStir * 0.34 + ignitionFlow * 0.18,
+      0,
+      1,
+    );
 
     const target = {
-      vertical: clamp(1.05 - motion * 1.65 - flow * 0.55, 0, 1),
-      spiral: clamp(0.12 + smoothstep(0.09, 0.36, motion) * 0.76 + breath * 0.11, 0, 1),
-      split: clamp(flow * 1.24 + smoothstep(0.28, 0.68, motion) * 0.44, 0, 1),
-      broken: clamp(smoothstep(0.42, 0.82, motion) * 0.95, 0, 1),
-      curl: clamp(0.28 + (1 - Math.abs(motion - 0.23) * 2.4) * 0.48 - flow * 0.16, 0, 1),
-      low: clamp(smoothstep(0.66, 0.96, motion) * 0.92 + state.input.brightness * 0.6, 0, 1),
+      vertical: clamp(0.98 - disturbance * 0.96 - ignitionStir * 0.16, 0.06, 0.98),
+      spiral: clamp(0.04 + breath * 0.04, 0.02, 0.1),
+      split: clamp(flow * 1.15 + ignitionFlow * 0.38 + smoothstep(0.14, 0.72, disturbance) * 0.68 + ignitionStir * 0.18, 0, 1),
+      broken: clamp(smoothstep(0.5, 0.98, disturbance) * 0.42 + ignitionStir * 0.08, 0, 1),
+      curl: clamp(0.24 + disturbance * 0.22 + breath * 0.08 + ignitionStir * 0.16, 0.18, 0.68),
+      low: clamp(smoothstep(0.42, 0.95, disturbance) * 0.82 + state.input.brightness * 0.42 + ignitionStir * 0.08, 0, 1),
     };
 
-    const t = 1 - Math.exp(-dt * 1.55);
+    const t = 1 - Math.exp(-dt * 0.52);
     Object.keys(state.shape).forEach((key) => {
       state.shape[key] = lerp(state.shape[key], target[key], t);
     });
 
     const scores = {
-      straight: state.shape.vertical * 1.15 - flow * 0.22,
-      spiral: state.shape.spiral * (0.86 - state.shape.broken * 0.22),
-      split: state.shape.split,
-      broken: state.shape.broken * 1.06,
-      curl: state.shape.curl * (1 - state.shape.low * 0.28),
-      low: state.shape.low * 1.1,
+      straight: state.shape.vertical * 1.18 - disturbance * 0.36,
+      spiral: state.shape.spiral * 0.34,
+      split: state.shape.split * 0.95,
+      broken: state.shape.broken * 1.08,
+      curl: state.shape.curl * (1 - disturbance * 0.62),
+      low: state.shape.low,
     };
     let nextMode = state.activeMode;
     let topScore = -Infinity;
@@ -434,25 +517,59 @@
     });
 
     if (nextMode !== state.activeMode) {
-      state.activeMode = nextMode;
-      state.modeSince = performance.now();
+      if (state.modeCandidate !== nextMode) {
+        state.modeCandidate = nextMode;
+        state.modeCandidateSince = now;
+      }
+      const minStay = state.activeMode === "straight" ? 5200 : 6200;
+      const candidateHold = state.camera.ready ? 2200 : 1600;
+      if (now - state.modeSince > minStay && now - state.modeCandidateSince > candidateHold) {
+        state.activeMode = nextMode;
+        state.modeSince = now;
+      }
+    } else {
+      state.modeCandidate = nextMode;
+      state.modeCandidateSince = now;
+    }
+  }
+
+  function updateHint(now, dt) {
+    if (state.hint.phase !== "dissolving") return;
+
+    const ageMs = now - state.hint.dissolveStart;
+    for (let i = state.hint.wisps.length - 1; i >= 0; i -= 1) {
+      const wisp = state.hint.wisps[i];
+      wisp.age += dt;
+      const life = wisp.age / wisp.life;
+      const n = noise2(wisp.seed, wisp.age * 0.9 + now * 0.00012) - 0.5;
+      wisp.vx += n * dt * 14;
+      wisp.vy -= dt * 3.6;
+      wisp.x += wisp.vx * dt;
+      wisp.y += wisp.vy * dt;
+      if (life >= 1) state.hint.wisps.splice(i, 1);
+    }
+
+    if (ageMs > 3900 && !state.hint.wisps.length) {
+      state.hint.phase = "done";
     }
   }
 
   function updateSmoke(now, dt) {
     const layout = getLayout();
     const burning = state.phase === "igniting" || state.phase === "burning";
+    const ignitionStir = getIgnitionStir(now);
+    const ignitionFlow = getIgnitionFlow(now);
     if (burning) {
       const ignitionBoost = state.phase === "igniting" ? 1.25 : 1;
-      const brokenGate =
-        state.shape.broken > 0.32
-          ? 0.46 + Math.sin(now * 0.012) * 0.32 + noise2(now * 0.001, 4.2) * 0.22
-          : 1;
-      const rate = (4.8 + state.shape.curl * 3.8 + state.shape.split * 3.2) * ignitionBoost * brokenGate;
+      const brokenGate = 1 - state.shape.broken * 0.14;
+      const rate =
+        (6.4 + state.shape.vertical * 1.2 + state.shape.curl * 3 + state.shape.split * 5.2 + state.shape.low * 2.2 + ignitionStir * 2.6) *
+        ignitionBoost *
+        brokenGate;
       state.smokeAccumulator += dt * rate;
       const count = Math.min(3, Math.floor(state.smokeAccumulator));
       state.smokeAccumulator -= count;
-      for (let i = 0; i < count; i += 1) {
+      for (let i = 0; i < count && state.particles.length < 88; i += 1) {
         spawnSmoke(layout.head, state.phase === "igniting" ? 1.08 : 1);
       }
 
@@ -463,6 +580,18 @@
 
     const input = state.input;
     const shape = state.shape;
+    const disturbance = clamp(
+      input.amount * 1.06 +
+        Math.abs(input.flowX) * 0.86 +
+        Math.abs(ignitionFlow) * 0.26 +
+        shape.split * 0.28 +
+        shape.broken * 0.32 +
+        ignitionStir * 0.32 +
+        (state.camera.ready ? 0.14 : 0),
+      0,
+      1,
+    );
+    const spread = smoothstep(0.12, 0.86, disturbance);
     for (let i = state.particles.length - 1; i >= 0; i -= 1) {
       const p = state.particles[i];
       p.age += dt;
@@ -470,37 +599,58 @@
       const n2 = noise2(p.x * 0.004 - p.seed, p.age * 0.55 + now * 0.00012);
       const life = p.age / p.life;
       const lift = 1 - smoothstep(0.58, 1, life) * 0.42;
-      const splitDrift = p.splitSign * shape.split * smoothstep(0.1, 0.72, life) * 34;
-      const curlDrift = (n - 0.5) * (10 + shape.curl * 52 + shape.spiral * 26);
-      const spiralDrift = Math.sin(p.age * (1.28 + shape.spiral * 2.35) + p.seed) * shape.spiral * 34;
-      const flowDrift = input.flowX * (15 + input.amount * 52);
-      const lowTurn = shape.low * smoothstep(0.16, 0.7, life) * (34 + input.amount * 32);
-      const targetVx = curlDrift + spiralDrift + splitDrift + flowDrift + p.spin * lowTurn;
+      const ageSpread = smoothstep(0.14, 0.92, life);
+      const combinedFlow = input.flowX + ignitionFlow * 0.58;
+      const splitDrift = (p.splitSign * 0.34 + p.spin * 0.58) * spread * ageSpread * (20 + input.amount * 74 + ignitionStir * 36);
+      const curlDrift = (n - 0.5) * (7 + shape.curl * 14 + spread * 84 + ignitionStir * 32);
+      const flowDrift = combinedFlow * ageSpread * (44 + input.amount * 138 + ignitionStir * 62);
+      const silkDrift = Math.sin(p.seed + p.age * (0.48 + p.silk * 0.18)) * spread * ageSpread * (18 + p.silk * 20 + ignitionStir * 16);
+      const lowTurn = shape.low * smoothstep(0.16, 0.7, life) * (16 + input.amount * 22);
+      const targetVx = curlDrift + splitDrift + flowDrift + silkDrift + p.spin * lowTurn * 0.12;
       const targetVy =
-        -26 * (0.55 + shape.vertical * 0.7) * lift -
-        shape.curl * 6 +
-        shape.low * smoothstep(0.18, 0.86, life) * 44 +
-        (n2 - 0.5) * 6;
+        -30 * (0.64 + shape.vertical * 0.82) * lift * (1 - spread * 0.5) -
+        shape.curl * 2.4 +
+        shape.low * smoothstep(0.18, 0.86, life) * 30 +
+        spread * ageSpread * 18 +
+        ignitionStir * ageSpread * 9 +
+        (n2 - 0.5) * (8 + spread * 12);
 
-      p.vx = lerp(p.vx, targetVx, 1 - Math.exp(-dt * 0.92));
-      p.vy = lerp(p.vy, targetVy, 1 - Math.exp(-dt * 0.86));
+      p.vx = lerp(p.vx, targetVx, 1 - Math.exp(-dt * 0.58));
+      p.vy = lerp(p.vy, targetVy, 1 - Math.exp(-dt * 0.55));
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.width += dt * (0.5 + shape.split * 0.55 + shape.low * 0.8);
+      p.width += dt * (0.58 + spread * 3.15 + shape.low * 0.95);
       p.trailClock += dt;
-      if (p.trailClock >= 0.036) {
+      if (p.trail.length) {
+        const headPoint = p.trail[p.trail.length - 1];
+        headPoint.x = p.x;
+        headPoint.y = p.y;
+      }
+      if (p.trailClock >= 0.042) {
         p.trail.push({ x: p.x, y: p.y });
-        p.trailClock = 0;
+        p.trailClock %= 0.042;
         if (p.trail.length > p.trailLength) p.trail.shift();
+      }
+
+      if (spread > 0.06 && Math.abs(combinedFlow) > 0.015 && p.trail.length > 4) {
+        const windPush = combinedFlow * dt * (54 + input.amount * 156 + ignitionStir * 86);
+        const loosen = spread * dt * (2.5 + input.amount * 8 + ignitionStir * 5);
+        for (let j = 0; j < p.trail.length - 1; j += 1) {
+          const local = j / (p.trail.length - 1);
+          const influence = smoothstep(0.08, 1, local) * (0.28 + local * 0.9);
+          p.trail[j].x += windPush * influence;
+          p.trail[j].y += loosen * smoothstep(0.3, 1, local);
+        }
       }
 
       const fadeIn = smoothstep(0.02, 0.2, life);
       const fadeOut = Math.pow(clamp(1 - life, 0, 1), 0.55);
-      p.alpha = p.baseAlpha * fadeIn * fadeOut * (1 - shape.broken * 0.42);
+      p.alpha = p.baseAlpha * fadeIn * fadeOut * (1 - spread * 0.18) * (1 - shape.broken * 0.18);
 
-      if (shape.broken > 0.28) {
-        const gap = noise2(p.seed + now * 0.0015, p.age * 1.45);
-        p.alpha *= gap > 0.45 + shape.broken * 0.28 ? 1 : 0.08;
+      if (shape.broken > 0.14) {
+        const veilNoise = noise2(p.seed * 0.73 + p.age * 0.18, p.seed * 0.19 + life * 1.6);
+        const veil = smoothstep(0.22, 0.86, veilNoise);
+        p.alpha *= lerp(1, 0.62 + veil * 0.34, shape.broken);
       }
 
       if (p.age >= p.life || p.y < -120 || p.x < -160 || p.x > width + 160) {
@@ -526,24 +676,27 @@
       const word = state.words[i];
       word.age += dt * 1000;
       const life = word.age / word.life;
-      word.x = word.startX + Math.sin(life * Math.PI * 1.7 + word.seed) * 16;
-      word.y = word.startY - life * 28 + Math.sin(word.seed + life * 4) * 6;
+      word.x = word.startX + Math.sin(life * Math.PI * 1.25 + word.seed) * 12;
+      word.y = word.startY - life * 22 + Math.sin(word.seed + life * 3.2) * 4.5;
       if (word.age >= word.life) state.words.splice(i, 1);
     }
   }
 
   function maybeSpawnPrompt(now) {
     if (state.phase !== "burning") return;
-    if (state.words.length > 2) return;
-    const minGap = state.activeMode === "straight" ? 7200 : 5800;
+    const group = promptGroupByMode[state.activeMode] || "peaceful";
+    const maxWords = group === "settling" ? 4 : 2;
+    if (state.words.length >= maxWords) return;
+    const minGap = group === "settling" ? 6500 : state.activeMode === "straight" ? 15500 : 13500;
     if (now - state.lastPromptAt < minGap) return;
 
-    const pool = prompts[state.activeMode] || prompts.curl;
+    const pool = prompts[group];
     const text = pool[Math.floor(Math.random() * pool.length)];
     const layout = getLayout();
     const verticalOffset = randomRange(86, Math.min(280, height * 0.42));
     const side = state.input.flowX * 80 + randomRange(-48, 48);
-    spawnWord(text, layout.head.x + side, layout.head.y - verticalOffset, randomRange(4200, 6500));
+    const life = group === "settling" ? randomRange(6800, 9200) : randomRange(7600, 10800);
+    spawnWord(text, layout.head.x + side, layout.head.y - verticalOffset, life);
     state.lastPromptAt = now;
   }
 
@@ -551,6 +704,7 @@
     ctx.clearRect(0, 0, width, height);
     drawAmbient(now);
     drawSmoke(now);
+    drawHint(now);
     drawWords();
     drawBowlAndIncense(now);
     drawSparks();
@@ -604,161 +758,125 @@
   }
 
   function drawSmoke(now) {
-    drawProceduralSmoke(now);
     if (!state.particles.length) return;
+
+    const ignitionStir = getIgnitionStir(now);
+    const disturbance = clamp(
+      state.input.amount * 1.02 + Math.abs(state.input.flowX) * 0.84 + state.shape.split * 0.28 + ignitionStir * 0.3 + (state.camera.ready ? 0.14 : 0),
+      0,
+      1,
+    );
+    const spread = smoothstep(0.08, 0.78, disturbance);
 
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
     state.particles.forEach((p) => {
       const life = p.age / p.life;
-      const alpha = clamp(p.alpha, 0, 0.16);
+      const alpha = clamp(p.alpha, 0, 0.2);
       if (alpha <= 0.004 || p.trail.length < 3) return;
 
-      drawSmokeTrail(p, alpha * 0.12, p.width * (1.8 + life * 0.6), "rgba(178, 188, 180, ALPHA)");
-      drawSmokeTrail(p, alpha * 0.28, p.width * (0.62 + life * 0.18), "rgba(212, 218, 210, ALPHA)");
+      drawSmokeTrail(p, alpha * (0.2 + spread * 0.08), p.width * (2.32 + spread * 1.8 + life * 0.58), "rgba(150, 163, 157, ALPHA)");
+      drawSmokeTrail(p, alpha * (0.33 - spread * 0.02), p.width * (0.52 + spread * 0.48 + life * 0.12), "rgba(214, 221, 213, ALPHA)");
     });
     ctx.restore();
   }
 
-  function drawProceduralSmoke(now) {
-    const active = state.phase === "igniting" || state.phase === "burning";
-    if (!active) return;
-
-    const layout = getLayout();
-    const head = layout.head;
-    const time = now * 0.001;
-    const shape = state.shape;
-    const motion = state.input.amount;
-    const flow = state.input.flowX;
-    const plumeHeight = clamp(height * 0.38, 230, 430);
-    const activeSpread = clamp(shape.curl + shape.spiral + shape.split + motion * 0.7, 0, 1.6);
-    const calmSmoke = shape.vertical > 0.72 && motion < 0.12 && Math.abs(flow) < 0.12;
-    const strandCount = calmSmoke
-      ? 1
-      : Math.round(lerp(2, 5, clamp(activeSpread * 0.58 + shape.split * 0.25, 0, 1)));
-
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    for (let i = 0; i < strandCount; i += 1) {
-      const sign = i % 2 === 0 ? -1 : 1;
-      const order = Math.floor(i / 2) + 1;
-      const phase = i * 1.73 + Math.sin(time * 0.13 + i) * 0.7;
-      const points = [];
-      const steps = 18;
-      const endT = calmSmoke ? 0.92 : 0.68 + fract(Math.sin(i * 43.31 + 7.1) * 19.19) * 0.28;
-
-      for (let step = 0; step <= steps; step += 1) {
-        const t = (step / steps) * endT;
-        const lift = smoothstep(0.02, 0.92, t);
-        const upper = smoothstep(0.2, 1, t);
-        const calm = shape.vertical * (1 - motion * 0.5);
-        const curlAmp = (4 + shape.curl * 28 + shape.spiral * 44 + motion * 28) * upper;
-        const slowWave = Math.sin(phase + t * (3.1 + shape.spiral * 4.2) + time * (0.55 + shape.spiral * 0.55));
-        const fineWave = Math.sin(phase * 1.8 + t * 9.5 - time * 0.38) * (1 - calm) * 8;
-        const split = sign * order * shape.split * upper * (30 + motion * 42);
-        const current = flow * upper * upper * (70 + motion * 86);
-        const lowCurl = shape.low * upper * (34 + motion * 42);
-        const x =
-          head.x +
-          split +
-          current +
-          slowWave * curlAmp * (calmSmoke ? 0.36 : 1) +
-          fineWave +
-          sign * order * (1 - calm) * 4;
-        const y =
-          head.y -
-          t * plumeHeight * (0.72 + calm * 0.22) +
-          lowCurl * t * t +
-          Math.sin(phase + t * 5.4 + time * 0.22) * shape.low * 18;
-        points.push({ x, y, local: step / steps });
-      }
-
-      const broken = shape.broken > 0.36;
-      if (broken) ctx.setLineDash([18, 16 + shape.broken * 22]);
-      const baseAlpha = (0.052 + shape.vertical * 0.018 + shape.curl * 0.03) * (1 - shape.broken * 0.35);
-      strokeSmokeLayer(points, [155, 166, 158], baseAlpha * (calmSmoke ? 0.13 : 0.2), 13 + activeSpread * 7, 0.02, 0.78);
-      strokeSmokeLayer(points, [204, 214, 206], baseAlpha * (calmSmoke ? 0.5 : 0.82), 4.4 + activeSpread * 2.2, 0, 0.88);
-      strokeSmokeLayer(points, [246, 241, 226], baseAlpha * (calmSmoke ? 0.12 : 0.46), 1 + activeSpread * 0.6, 0, 0.94);
-      drawSmokeFeather(points, phase, baseAlpha, activeSpread, calmSmoke);
-      if (broken) ctx.setLineDash([]);
-    }
-
-    ctx.restore();
-  }
-
-  function strokeSmokeLayer(points, color, alpha, lineWidth, fromRatio, toRatio) {
-    if (points.length < 2) return;
-    const start = Math.max(0, Math.floor(points.length * fromRatio));
-    const end = Math.min(points.length - 1, Math.ceil(points.length * toRatio));
-    if (end - start < 1) return;
-
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha.toFixed(4)})`;
-    ctx.lineWidth = lineWidth;
-    ctx.beginPath();
-    ctx.moveTo(points[start].x, points[start].y);
-
-    for (let i = start + 1; i < end - 1; i += 1) {
-      const current = points[i];
-      const next = points[i + 1];
-      ctx.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5);
-    }
-
-    ctx.lineTo(points[end].x, points[end].y);
-    ctx.stroke();
-  }
-
-  function drawSmokeFeather(points, seed, baseAlpha, activeSpread, calmSmoke) {
-    const startIndex = Math.max(1, Math.floor(points.length * 0.62));
-    const tip = points[Math.min(points.length - 1, Math.floor(points.length * 0.94))];
-    const strands = calmSmoke ? 3 : 4;
+  function drawSmokeTrail(p, alpha, baseWidth, colorTemplate) {
+    const points = p.trail;
+    if (points.length < 3) return;
 
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    for (let i = 0; i < strands; i += 1) {
-      const origin = points[startIndex + ((i * 2) % Math.max(1, points.length - startIndex - 2))];
-      const sign = i % 2 === 0 ? -1 : 1;
-      const drift = sign * (10 + i * 4 + activeSpread * 12);
-      const fade = 0.18 - i * 0.026;
-      const controlX = (origin.x + tip.x) * 0.5 + Math.sin(seed + i * 2.7) * 14 + drift * 0.45;
-      const controlY = (origin.y + tip.y) * 0.5 - 12 - i * 5;
-      const endX = tip.x + drift + Math.sin(seed * 1.6 + i) * 18;
-      const endY = tip.y - 16 - i * 10;
+    const step = Math.max(2, Math.ceil(points.length / 18));
+    for (let i = step; i < points.length; i += step) {
+      const from = points[Math.max(0, i - step)];
+      const control = points[Math.max(0, i - Math.ceil(step / 2))];
+      const to = points[i];
+      const local = i / (points.length - 1);
+      const rootFade = smoothstep(0, 0.26, local);
+      const body = Math.pow(Math.sin(local * Math.PI), 0.42);
+      const topFade = 1 - local * 0.38;
+      const segmentAlpha = alpha * rootFade * (0.26 + body * 0.5) * topFade;
+      const segmentWidth = baseWidth * rootFade * (0.16 + body * 0.68) * (1 - local * 0.34);
+      if (segmentAlpha <= 0.0015 || segmentWidth <= 0.08) continue;
 
-      ctx.strokeStyle = `rgba(213, 222, 214, ${(baseAlpha * fade).toFixed(4)})`;
-      ctx.lineWidth = clamp((2.4 - i * 0.36) + activeSpread * 0.8, 0.45, 4.2);
+      ctx.strokeStyle = colorTemplate.replace("ALPHA", segmentAlpha.toFixed(4));
+      ctx.lineWidth = clamp(segmentWidth, 0.2, 20);
       ctx.beginPath();
-      ctx.moveTo(origin.x, origin.y);
-      ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+      ctx.moveTo(from.x, from.y);
+      ctx.quadraticCurveTo(control.x, control.y, to.x, to.y);
       ctx.stroke();
     }
   }
 
-  function drawSmokeTrail(p, alpha, baseWidth, colorTemplate) {
-    const points = p.trail;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = colorTemplate.replace("ALPHA", alpha.toFixed(4));
-    ctx.lineWidth = clamp(baseWidth, 0.35, 13);
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+  function drawHint(now) {
+    if (state.hint.phase === "done") return;
 
-    for (let i = 1; i < points.length - 2; i += 1) {
-      const current = points[i];
-      const next = points[i + 1];
-      const midX = (current.x + next.x) * 0.5;
-      const midY = (current.y + next.y) * 0.5;
-      ctx.quadraticCurveTo(current.x, current.y, midX, midY);
+    const layout = getLayout();
+    const hint = getHintPosition(layout);
+    const fontSize = clamp(width * 0.027, 18, 30);
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${fontSize}px "Noto Serif SC", "Songti SC", "STSong", serif`;
+    ctx.shadowColor = "rgba(185, 150, 110, 0.24)";
+    ctx.shadowBlur = 20;
+
+    if (state.hint.phase === "waiting") {
+      const breathCycle = 5200;
+      const breathWave = (1 - Math.cos((now / breathCycle) * Math.PI * 2)) * 0.5;
+      const breath = smoothstep(0, 1, breathWave);
+      const blur = breath * 1.75;
+      ctx.shadowBlur = 14 + breath * 18;
+      ctx.globalAlpha = 0.78 - breath * 0.12;
+      ctx.filter = `blur(${blur.toFixed(2)}px)`;
+      ctx.fillStyle = "rgba(226, 222, 205, 0.74)";
+      ctx.fillText("请点香", hint.x, hint.y);
+      if (breath < 0.55) {
+        ctx.filter = "none";
+        ctx.globalAlpha = (0.55 - breath) * 0.38;
+        ctx.fillStyle = "rgba(244, 239, 218, 0.82)";
+        ctx.fillText("请点香", hint.x, hint.y);
+      }
+      ctx.restore();
+      return;
     }
 
-    const last = points[points.length - 1];
-    ctx.lineTo(last.x, last.y);
-    ctx.stroke();
+    const age = Math.max(0, (now - state.hint.dissolveStart) / 1000);
+    const textAlpha = 1 - smoothstep(0.08, 1.25, age);
+    if (textAlpha > 0.01) {
+      ctx.globalAlpha = textAlpha * 0.68;
+      ctx.filter = `blur(${smoothstep(0, 1.25, age) * 3.2}px)`;
+      ctx.fillStyle = "rgba(226, 222, 205, 0.72)";
+      ctx.fillText("请点香", hint.x, hint.y - age * 4);
+      ctx.filter = "none";
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    state.hint.wisps.forEach((wisp) => {
+      const life = wisp.age / wisp.life;
+      const alpha = Math.pow(clamp(1 - life, 0, 1), 1.35) * 0.18;
+      if (alpha <= 0.006) return;
+      const curl = Math.sin(wisp.seed + life * 4.6) * (5 + life * 12);
+      const lift = life * (12 + wisp.size * 7);
+      ctx.strokeStyle = `rgba(207, 216, 208, ${alpha.toFixed(4)})`;
+      ctx.lineWidth = wisp.size * (0.82 + life * 1.2);
+      ctx.beginPath();
+      ctx.moveTo(wisp.x, wisp.y);
+      ctx.quadraticCurveTo(
+        wisp.x + curl * 0.45,
+        wisp.y - lift * 0.45,
+        wisp.x + curl,
+        wisp.y - lift,
+      );
+      ctx.stroke();
+    });
+
+    ctx.restore();
   }
 
   function drawWords() {
@@ -769,7 +887,7 @@
     ctx.textBaseline = "middle";
     state.words.forEach((word) => {
       const life = word.age / word.life;
-      const alpha = Math.sin(clamp(life, 0, 1) * Math.PI);
+      const alpha = smoothstep(0, 0.16, life) * (1 - smoothstep(0.74, 1, life));
       const size = word.text.length > 5 ? clamp(width * 0.022, 16, 25) : clamp(width * 0.027, 18, 30);
       ctx.font = `${size}px "Noto Serif SC", "Songti SC", "STSong", serif`;
       ctx.globalAlpha = alpha * 0.76;
@@ -784,11 +902,12 @@
 
   function drawBowlAndIncense(now) {
     const layout = getLayout();
-    drawIncense(layout, now);
+    drawIncenseBack(layout, now);
     drawBowl(layout);
+    drawIncenseFront(layout, now);
   }
 
-  function drawIncense(layout, now) {
+  function drawIncenseBack(layout) {
     const { centerX, baseY, head, stickLength } = layout;
     const lit = state.phase === "igniting" || state.phase === "burning";
     const ended = state.phase === "ended";
@@ -807,7 +926,7 @@
       ctx.lineWidth = clamp(width * 0.004, 2.4, 4.4);
       ctx.beginPath();
       ctx.moveTo(centerX, visibleTop);
-      ctx.lineTo(centerX, baseY + 8);
+      ctx.lineTo(centerX, baseY + layout.bowl.h * 0.18);
       ctx.stroke();
 
       const sideLight = ctx.createLinearGradient(centerX - 2, visibleTop, centerX + 2, visibleTop);
@@ -818,8 +937,55 @@
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(centerX + 1.3, visibleTop + 6);
-      ctx.lineTo(centerX + 1.3, baseY);
+      ctx.lineTo(centerX + 1.3, baseY + layout.bowl.h * 0.08);
       ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawIncenseFront(layout, now) {
+    const { centerX, baseY, head, stickLength, bowl } = layout;
+    const lit = state.phase === "igniting" || state.phase === "burning";
+    const ended = state.phase === "ended";
+    const remaining = stickLength * (1 - state.burnProgress);
+    const visibleTop = ended ? baseY - bowl.h * 0.08 : head.y;
+    const bridgeTop = baseY - bowl.h * 0.18;
+    const bridgeBottom = baseY + bowl.h * 0.045;
+
+    ctx.save();
+    ctx.lineCap = "round";
+
+    if (!ended && remaining > 4) {
+      const foregroundTop = Math.max(visibleTop, bridgeTop);
+      const stickGradient = ctx.createLinearGradient(centerX - 3, foregroundTop, centerX + 3, bridgeBottom);
+      stickGradient.addColorStop(0, state.phase === "idle" ? "#3e2d20" : "#563521");
+      stickGradient.addColorStop(0.52, "#5a3a22");
+      stickGradient.addColorStop(1, "#2b1c13");
+      ctx.strokeStyle = stickGradient;
+      ctx.lineWidth = clamp(width * 0.004, 2.4, 4.4);
+      ctx.beginPath();
+      ctx.moveTo(centerX, foregroundTop);
+      ctx.lineTo(centerX, bridgeBottom);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(204, 145, 86, 0.14)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX + 1.3, foregroundTop + 2);
+      ctx.lineTo(centerX + 1.3, bridgeBottom - 2);
+      ctx.stroke();
+    }
+
+    if (ended) {
+      ctx.strokeStyle = "rgba(90, 84, 72, 0.45)";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(centerX, visibleTop);
+      ctx.lineTo(centerX, baseY + bowl.h * 0.035);
+      ctx.stroke();
+      ctx.restore();
+      return;
     }
 
     if (lit) {
@@ -831,7 +997,7 @@
       ctx.lineWidth = clamp(width * 0.003, 1.8, 3.2);
       ctx.beginPath();
       ctx.moveTo(centerX, head.y + 1);
-      ctx.lineTo(centerX + Math.sin(now * 0.002) * 1.2, head.y + ashLength);
+      ctx.lineTo(centerX + Math.sin(now * 0.002) * 1.2, Math.min(head.y + ashLength, baseY + bowl.h * 0.04));
       ctx.stroke();
 
       const glow = ctx.createRadialGradient(centerX, head.y, 0.4, centerX, head.y, 18 + ember * 15);
@@ -849,20 +1015,11 @@
       ctx.beginPath();
       ctx.ellipse(centerX, head.y, 2.6, 4.2, 0, 0, Math.PI * 2);
       ctx.fill();
-    } else if (!ended) {
+    } else {
       ctx.fillStyle = "rgba(74, 55, 40, 0.92)";
       ctx.beginPath();
       ctx.ellipse(centerX, head.y, 2.1, 3.7, 0, 0, Math.PI * 2);
       ctx.fill();
-    }
-
-    if (ended) {
-      ctx.strokeStyle = "rgba(90, 84, 72, 0.45)";
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.moveTo(centerX, baseY - 3);
-      ctx.lineTo(centerX, baseY + 10);
-      ctx.stroke();
     }
 
     ctx.restore();
@@ -1028,6 +1185,7 @@
     state.pointer.y = point.y;
     state.pointer.lastX = point.x;
     state.pointer.lastY = point.y;
+    state.pointer.lastMoveAt = performance.now();
     state.pointer.active = true;
 
     const layout = getLayout();
@@ -1039,16 +1197,24 @@
   }
 
   function onPointerMove(event) {
+    const now = performance.now();
     const point = eventPoint(event);
     const dx = point.x - state.pointer.lastX;
     const dy = point.y - state.pointer.lastY;
     const distance = Math.hypot(dx, dy);
+    const elapsed = clamp((now - (state.pointer.lastMoveAt || now - 16.7)) / 16.7, 0.55, 3.2);
+    const frameDx = dx / elapsed;
+    const frameDistance = distance / elapsed;
     state.pointer.x = point.x;
     state.pointer.y = point.y;
     state.pointer.lastX = point.x;
     state.pointer.lastY = point.y;
-    state.pointer.amount = clamp(state.pointer.amount + distance / 48, 0, 1);
-    state.pointer.flowX = clamp(lerp(state.pointer.flowX, dx / 42, 0.42), -1, 1);
+    state.pointer.lastMoveAt = now;
+    const motion = clamp(frameDistance / 16, 0, 1);
+    const flow = clamp(frameDx / 34, -1, 1);
+    const amountEase = motion > state.pointer.amount ? 0.42 : 0.18;
+    state.pointer.amount = lerp(state.pointer.amount, motion, amountEase);
+    state.pointer.flowX = clamp(lerp(state.pointer.flowX, flow, 0.3), -1, 1);
   }
 
   function onPointerUp() {
@@ -1067,6 +1233,9 @@
   function tick(now) {
     const dt = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
     lastFrame = now;
+    if (state.particles.length > 82 && dt > 0.034) {
+      state.particles.splice(0, state.particles.length - 82);
+    }
     update(now, dt);
     draw(now);
     requestAnimationFrame(tick);
