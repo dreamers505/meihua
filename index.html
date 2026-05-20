@@ -17,9 +17,17 @@
 
       <div id="quietHint" class="quiet-hint">请点香</div>
       <div id="cameraState" class="camera-state">静候</div>
+      <button
+        id="musicToggle"
+        class="music-toggle"
+        type="button"
+        aria-label="开启背景音乐"
+        aria-pressed="false"
+      ></button>
 
       <video id="cameraFeed" playsinline muted aria-hidden="true"></video>
       <canvas id="motionBuffer" aria-hidden="true"></canvas>
+      <audio id="bgMusic" src="./assets/background.mp3" preload="auto" loop></audio>
     </main>
 
     <script src="./app.js"></script>

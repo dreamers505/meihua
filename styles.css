@@ -132,7 +132,7 @@ body {
 
 .camera-state {
   right: clamp(16px, 3vw, 42px);
-  bottom: clamp(20px, 4vw, 42px);
+  bottom: clamp(72px, 9vw, 96px);
   max-width: 44vw;
   font-size: clamp(0.72rem, 1.35vw, 0.9rem);
   color: rgba(210, 188, 158, 0.36);
@@ -141,6 +141,89 @@ body {
 
 .camera-state.is-visible {
   opacity: 0.58;
+}
+
+.music-toggle {
+  position: absolute;
+  right: clamp(16px, 3vw, 42px);
+  bottom: clamp(22px, 4vw, 44px);
+  z-index: 4;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(210, 188, 158, 0.2);
+  border-radius: 50%;
+  background: rgba(10, 8, 6, 0.32);
+  box-shadow:
+    0 0 24px rgba(216, 122, 54, 0.08),
+    inset 0 0 18px rgba(232, 220, 198, 0.035);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    opacity 240ms ease,
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    transform 240ms ease;
+}
+
+.music-toggle::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  width: 9px;
+  height: 13px;
+  background: rgba(232, 220, 198, 0.62);
+  clip-path: polygon(0 28%, 42% 28%, 100% 0, 100% 100%, 42% 72%, 0 72%);
+}
+
+.music-toggle::after {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 12px;
+  width: 10px;
+  height: 16px;
+  border: 1.4px solid rgba(232, 220, 198, 0.46);
+  border-left: 0;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 0 16px 16px 0;
+  transform: scaleX(0.72);
+}
+
+.music-toggle:hover,
+.music-toggle:focus-visible {
+  opacity: 0.96;
+  border-color: rgba(226, 190, 136, 0.44);
+  box-shadow:
+    0 0 26px rgba(216, 122, 54, 0.14),
+    inset 0 0 18px rgba(232, 220, 198, 0.06);
+}
+
+.music-toggle:focus-visible {
+  outline: 1px solid rgba(232, 220, 198, 0.5);
+  outline-offset: 4px;
+}
+
+.music-toggle.is-on {
+  opacity: 0.9;
+  border-color: rgba(226, 190, 136, 0.38);
+}
+
+.music-toggle:not(.is-on) {
+  opacity: 0.52;
+}
+
+.music-toggle:not(.is-on)::after {
+  width: 13px;
+  height: 1.5px;
+  left: 18px;
+  top: 20px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(232, 220, 198, 0.52);
+  transform: rotate(-38deg);
 }
 
 #cameraFeed,
@@ -164,7 +247,7 @@ body {
 
   .camera-state {
     right: 18px;
-    bottom: 18px;
+    bottom: 70px;
     max-width: 58vw;
   }
 }

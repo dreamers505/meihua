@@ -10,6 +10,8 @@
   const ganzhiTimeEl = document.getElementById("ganzhiTime");
   const quietHint = document.getElementById("quietHint");
   const cameraState = document.getElementById("cameraState");
+  const musicToggle = document.getElementById("musicToggle");
+  const bgMusic = document.getElementById("bgMusic");
 
   const stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
   const branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
@@ -225,6 +227,48 @@
   function setCameraStatus(text, visible) {
     cameraState.textContent = text;
     cameraState.classList.toggle("is-visible", visible && Boolean(text));
+  }
+
+  function setupMusic() {
+    if (!bgMusic || !musicToggle) return;
+
+    bgMusic.loop = true;
+    bgMusic.volume = 0.42;
+    updateMusicToggle(false);
+
+    musicToggle.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    musicToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setMusicEnabled(bgMusic.paused);
+    });
+  }
+
+  async function setMusicEnabled(enabled) {
+    if (!bgMusic || !musicToggle) return;
+
+    if (!enabled) {
+      bgMusic.pause();
+      updateMusicToggle(false);
+      return;
+    }
+
+    try {
+      await bgMusic.play();
+      updateMusicToggle(true);
+    } catch {
+      bgMusic.pause();
+      updateMusicToggle(false);
+      setCameraStatus("轻点启音", true);
+      window.setTimeout(() => setCameraStatus("", false), 2200);
+    }
+  }
+
+  function updateMusicToggle(enabled) {
+    musicToggle.classList.toggle("is-on", enabled);
+    musicToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
+    musicToggle.setAttribute("aria-label", enabled ? "关闭背景音乐" : "开启背景音乐");
   }
 
   function getHintPosition(layout) {
@@ -1250,6 +1294,7 @@
   canvas.addEventListener("touchmove", (event) => event.preventDefault(), { passive: false });
 
   resize();
+  setupMusic();
   updateTime();
   window.setInterval(updateTime, 1000);
   requestAnimationFrame((now) => {
